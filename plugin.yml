@@ -1,0 +1,16 @@
+---
+name: HomeAPI
+version: 0.0.1
+main: minijaham\HomeAPI\Loader
+api: 5.10.0
+
+commands:
+  home:
+    description: Home Command
+    usage: "/home"
+    permission: home.command
+permissions:
+  home.command:
+    description: "Allows the user to run the home command"
+    default: op
+...
