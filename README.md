@@ -4,7 +4,8 @@ Simple Home API for PMMP using libasynql
 # Usage
 ## HomeManager.php
 ```php
-# You can call HomeManager instance either from the Loader (Loader::getHomeManager()), or HomeManager itself (HomeManager::getInstance())
+# You can call HomeManager instance either from the Loader (Loader::getHomeManager())
+# or HomeManager itself (HomeManager::getInstance())
 
 # Create a new home
 # Usage Example: HomeManager::createHome(Player, "home1")
