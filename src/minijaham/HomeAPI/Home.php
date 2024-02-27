@@ -81,9 +81,29 @@ final class Home
 	 */
 	public function teleport(Player $player) : void 
 	{
-		if (($pos = $this->getPosition()) === null) {
+		$pos = $this->getPosition();
+		if ($pos === null) {
 			throw new \RuntimeException("The target world is not available for teleport. Perhaps the world isn't loaded?");
 		}
-		$player->teleport($pos);
+		
+		$location = $player->getLocation();
+		$yaw = $location->getYaw();
+		$pitch = $location->getPitch();
+		
+		$chunkX = $pos->getFloorX() >> Chunk::COORD_BIT_SIZE;
+		$chunkZ = $pos->getFloorZ() >> Chunk::COORD_BIT_SIZE;
+		
+		$homeLocation = new Location($pos->getFloorX(), $pos->getFloorY(), $pos->getFloorZ(), $this->getWorld(), $yaw, $pitch);
+		
+		$this->getWorld()->orderChunkPopulation($chunkX, $chunkZ, null)->onCompletion(
+			function () use ($player, $homeLocation) : void {
+				if ($player !== null) {
+					$player->teleport($homeLocation);
+				}
+			},
+			function() : void {
+				throw new \RuntimeException("Something went wrong while executing Home::teleport().");
+			}
+		);
 	}
 }
