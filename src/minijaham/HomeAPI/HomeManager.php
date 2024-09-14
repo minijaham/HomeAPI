@@ -14,7 +14,7 @@ final class HomeManager
 {
 	use SingletonTrait;
 
-	/** @var Home[] */
+	/** Associative array with UUID as the first key and home name as the second */
 	private array $homes = [];
 
 	public function __construct(
@@ -26,7 +26,7 @@ final class HomeManager
 	}
 
 	/**
-	 * Store all home data in $homes property
+	 * Store all home data in $homes property using hashmap structure
 	 * 
 	 * @return void
 	 */
@@ -34,7 +34,11 @@ final class HomeManager
 	{
 		Loader::getDatabase()->executeSelect(Loader::HOMES_SELECT, [], function (array $rows) : void {
 			foreach ($rows as $row) {
-				$this->homes[] = new Home(
+				$uuid = Uuid::fromString($row["uuid"])->toString();
+				$home_name = $row["home_name"];
+
+				# Store home using UUID and home name as keys
+				$this->homes[$uuid][$home_name] = new Home(
 					Uuid::fromString($row["uuid"]),
 					$row["home_name"],
 					$row["world_name"],
@@ -48,8 +52,6 @@ final class HomeManager
 
 	/**
 	 * Create a home
-	 * 
-	 * Example: HomeManager::createSession($player, "homeName1")
 	 * 
 	 * @param Player $player
 	 * @param string $home_name
@@ -68,7 +70,8 @@ final class HomeManager
 
 		Loader::getDatabase()->executeInsert(Loader::HOMES_CREATE, $args);
 		
-		$this->homes[] = new Home(
+		# Store home using UUID and home name as keys
+		$this->homes[$args["uuid"]][$home_name] = new Home(
 			$player->getUniqueId(),
 			$args["home_name"],
 			$args["world_name"],
@@ -87,28 +90,10 @@ final class HomeManager
 	 */
 	public function getPlayerHome(UuidInterface $uuid, string $home_name) : ?Home
 	{
-		foreach ($this->homes as $home) {
-			# If the UUID does not match, skip to the next one
-			if (!$home->getUuid()->equals($uuid)) {
-				continue;
-			}
-			# If the name does not match, skip to the next one
-			if ($home->getName() !== $home_name) {
-				continue;
-			}
-			return $home;
-		}
-		return null;
+		$uuidStr = $uuid->toString();
 
-		/* 
-		 * This is a test version using array_filter
-		 * 
-		$filteredHomes = array_filter($this->homes, function($home) use ($uuid, $home_name) {
-			return $home->getUuid()->equals($uuid) && $home->getName() === $home_name;
-		});
-		
-		return $filteredHomes ? reset($filteredHomes) : null;
-		*/
+		# Directly access the home from the hashmap if it exists
+		return $this->homes[$uuidStr][$home_name] ?? null;
 	}
 
 	/**
@@ -119,17 +104,10 @@ final class HomeManager
 	 */
 	public function getHomeList(UuidInterface $uuid) : ?array
 	{
-		$fetched = [];
-		foreach ($this->homes as $home) {
-			# If the UUID does not match, skip to the next one
-			if (!$home->getUuid()->equals($uuid)) {
-				continue;
-			}
-			$fetched[] = $home;
-		}
+		$uuidStr = $uuid->toString();
 
-		# If the fetched array is empty, return null. Else, return fetched.
-		return empty($fetched) ? null : $fetched;
+		# Return all homes for the UUID or null if none exist
+		return $this->homes[$uuidStr] ?? null;
 	}
 
 	/**
@@ -140,12 +118,23 @@ final class HomeManager
 	 */
 	public function deleteHome(Home $home) : void 
 	{
+		$uuidStr = $home->getUuid()->toString();
+		$home_name = $home->getName();
+
 		Loader::getDatabase()->executeChange(Loader::HOMES_DELETE, [
-			"uuid" => $home->getUuid()->toString(),
-			"home_name" => $home->getName()
+			"uuid" => $uuidStr,
+			"home_name" => $home_name
 		]);
 
-		unset($this->homes[array_search($home, $this->homes)]);
+		# Remove the home from the array if it exists
+		if (isset($this->homes[$uuidStr][$home_name])) {
+			unset($this->homes[$uuidStr][$home_name]);
+
+			# Remove the UUID key if no more homes exist for the player
+			if (empty($this->homes[$uuidStr])) {
+				unset($this->homes[$uuidStr]);
+			}
+		}
 	}
 
 	/**
@@ -155,6 +144,11 @@ final class HomeManager
 	 */
 	public function getHomes() : array
 	{
-		return $this->homes;
+		$allHomes = [];
+		foreach ($this->homes as $playerHomes) {
+			$allHomes = array_merge($allHomes, $playerHomes);
+		}
+
+		return $allHomes;
 	}
 }
